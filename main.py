@@ -3,6 +3,18 @@ import serial
 from crc import checksum
 
 
+def analyze_rps_data(data: int):
+    if data < 0 or data > 255:
+        return
+
+    if data == 0x70:
+        print("Button B0 is pressed!")
+    elif data == 0x50:
+        print("Button B1 is pressed!")
+    else:
+        print("No button pressed")
+
+
 def analyze_frame_content(data: bytes):
     # Check frame length
     length = len(data)
@@ -53,6 +65,11 @@ def analyze_frame_content(data: bytes):
           f"\tPacket Type: {hex(packet_type)}\n\tHeader checksum: {hex(self_header_crc)}\n"
           f"\tFrame Data: {frame_data.hex(' ')}\n\tOptional Data: {optional_data.hex(' ')}\n"
           f"\tData Checksum: {hex(self_data_crc)}")
+    print("-------------------")
+
+    device_type = frame_data[0]
+    if device_type == 0xf6:
+        analyze_rps_data(frame_data[1])
     print("===================")
 
 
