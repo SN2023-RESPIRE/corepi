@@ -19,8 +19,8 @@ def analyze_4bs_data(data: bytes, sender: int):
     if sender == 0xffd5a80a:  # CO2 + Temperature + Humidity sensor
         print("CO2 + Temperature + Humidity sensor frame")
         humidity = data[0] * 0.5
-        co2 = data[2] * 10
-        temp = data[3] * 0.2
+        co2 = data[1] * 10
+        temp = data[2] * 51 / 255
         print(f"Humidity: {humidity}%")
         print(f"CO2: {co2} ppm")
         print(f"Temperature: {temp}°C")
