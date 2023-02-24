@@ -3,7 +3,7 @@ import serial
 from crc import checksum
 
 
-def analyze_rps_data(data: int):
+def analyze_rps_data(data: int, sender: int):
     if data < 0 or data > 255:
         return
 
@@ -13,6 +13,36 @@ def analyze_rps_data(data: int):
         print("Button B1 is pressed!")
     else:
         print("No button pressed")
+
+
+def analyze_4bs_data(data: bytes, sender: int):
+    if sender == 0xffd5a80a:  # CO2 + Temperature + Humidity sensor
+        print("CO2 + Temperature + Humidity sensor frame")
+        humidity = data[0] * 0.5
+        co2 = data[2] * 10
+        temp = data[3] * 0.2
+        print(f"Humidity: {humidity}%")
+        print(f"CO2: {co2} ppm")
+        print(f"Temperature: {temp}°C")
+    elif sender == 0xffd5a80f:  # VOC sensor
+        print("VOC sensor frame")
+        voc_amount = (data[0] << 8) + data[1]
+        voc_id = data[3]
+        print(f"VOC amount: {voc_amount} ppb")
+        print(f"VOC type: {voc_id}")
+    elif sender == 0xffd5a814:  # Particles sensor
+        print("Particle sensor frame")
+        particles = ((data[0] << 24) + (data[1] << 16) + (data[2] << 8) + data[3]) >> 5
+        # Using a mask is a little easier
+        pm1 = (particles & 0b111111111000000000000000000) >> 18
+        pm2 = (particles & 0b000000000111111111000000000) >> 9
+        pm10 = particles & 0b000000000000000000111111111
+        print(f"PM1 Amount: {pm1} µg/m3")
+        print(f"PM2.5 Amount: {pm2} µg/m3")
+        print(f"PM10 Amount: {pm10} µg/m3")
+    else:
+        print("Unidentified 4BS device detected")
+        return
 
 
 def analyze_frame_content(data: bytes):
@@ -65,11 +95,16 @@ def analyze_frame_content(data: bytes):
           f"\tPacket Type: {hex(packet_type)}\n\tHeader checksum: {hex(self_header_crc)}\n"
           f"\tFrame Data: {frame_data.hex(' ')}\n\tOptional Data: {optional_data.hex(' ')}\n"
           f"\tData Checksum: {hex(self_data_crc)}")
+    print(f"\tSender ID: {frame_data[-5:-1].hex(' ')}\n")
     print("-------------------")
 
     device_type = frame_data[0]
+    sender_bytes = frame_data[-5:-1]
+    sender = (sender_bytes[0] << 24) + (sender_bytes[1] << 16) + (sender_bytes[2] << 8) + sender_bytes[3]
     if device_type == 0xf6:
-        analyze_rps_data(frame_data[1])
+        analyze_rps_data(frame_data[1], sender)
+    elif device_type == 0xa5:
+        analyze_4bs_data(frame_data[1:5], sender)
     print("===================")
 
 
