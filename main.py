@@ -83,7 +83,7 @@ def main():
         timeout=0.1)
 
     while True:
-        data = port.readline()
+        data = port.readall()
         if data != b'':
             analyze_frame_content(data)
 
