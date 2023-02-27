@@ -1,8 +1,10 @@
 import serial
+import sqlite3
 
 from crc import checksum
 
 
+# TODO: maybe remove?
 def analyze_rps_data(data: int, sender: int):
     if data < 0 or data > 255:
         return
@@ -15,21 +17,29 @@ def analyze_rps_data(data: int, sender: int):
         print("No button pressed")
 
 
-def analyze_4bs_data(data: bytes, sender: int):
+def analyze_4bs_data(data: bytes, sender: int) -> dict:
     if sender == 0xffd5a80a:  # CO2 + Temperature + Humidity sensor
         print("CO2 + Temperature + Humidity sensor frame")
         humidity = data[0] * 0.5
         co2 = data[1] * 10
         temp = data[2] * 51 / 255
-        print(f"Humidity: {humidity}%")
-        print(f"CO2: {co2} ppm")
-        print(f"Temperature: {temp}°C")
+        # print(f"Humidity: {humidity}%")
+        # print(f"CO2: {co2} ppm")
+        # print(f"Temperature: {temp}°C")
+        return {
+            "humidity": humidity,
+            "co2_amount": co2,
+            "temperature": temp,
+        }
     elif sender == 0xffd5a80f:  # VOC sensor
         print("VOC sensor frame")
         voc_amount = (data[0] << 8) + data[1]
         voc_id = data[3]
-        print(f"VOC amount: {voc_amount} ppb")
-        print(f"VOC type: {voc_id}")
+        # print(f"VOC amount: {voc_amount} ppb")
+        # print(f"VOC type: {voc_id}")
+        return {
+            "cov_amount": voc_amount,
+        }
     elif sender == 0xffd5a814:  # Particles sensor
         print("Particle sensor frame")
         particles = ((data[0] << 24) + (data[1] << 16) + (data[2] << 8) + data[3]) >> 5
@@ -37,26 +47,31 @@ def analyze_4bs_data(data: bytes, sender: int):
         pm1 = (particles & 0b111111111000000000000000000) >> 18
         pm2 = (particles & 0b000000000111111111000000000) >> 9
         pm10 = particles & 0b000000000000000000111111111
-        print(f"PM1 Amount: {pm1} µg/m3")
-        print(f"PM2.5 Amount: {pm2} µg/m3")
-        print(f"PM10 Amount: {pm10} µg/m3")
+        # print(f"PM1 Amount: {pm1} µg/m3")
+        # print(f"PM2.5 Amount: {pm2} µg/m3")
+        # print(f"PM10 Amount: {pm10} µg/m3")
+        return {
+            "pm1_amount": pm1,
+            "pm2_5_amount": pm2,
+            "pm10_amount": pm10,
+        }
     else:
         print("Unidentified 4BS device detected")
-        return
+        return {}
 
 
-def analyze_frame_content(data: bytes):
+def analyze_frame_content(data: bytes) -> dict:
     # Check frame length
     length = len(data)
     if length <= 5:
         print("Invalid frame size")
-        return
+        return {}
 
     # Check sync byte
     sync_byte = data[0]
     if sync_byte != 0x55:
         print(f"Incorrect sync byte! Expected 0x55, got {hex(sync_byte)}")
-        return
+        return {}
 
     # Retrieve header
     data_length = data[1] * 255 + data[2]
@@ -70,7 +85,7 @@ def analyze_frame_content(data: bytes):
     # Abort on wrong checksum
     if frame_header_crc != self_header_crc:
         print(f"Invalid header CRC. Expected {hex(frame_header_crc)}, got {hex(self_header_crc)}")
-        return
+        return {}
 
     # Retrieve data
     frame_data = 0
@@ -86,7 +101,7 @@ def analyze_frame_content(data: bytes):
 
     if frame_data_crc != self_data_crc:
         print(f"Invalid data CRC. Expected {hex(frame_data_crc)}, got {hex(self_data_crc)}")
-        return
+        return {}
 
     print("Raw frame data:")
     print(f"\t{data.hex(' ')}")
@@ -101,14 +116,34 @@ def analyze_frame_content(data: bytes):
     device_type = frame_data[0]
     sender_bytes = frame_data[-5:-1]
     sender = (sender_bytes[0] << 24) + (sender_bytes[1] << 16) + (sender_bytes[2] << 8) + sender_bytes[3]
-    if device_type == 0xf6:
-        analyze_rps_data(frame_data[1], sender)
-    elif device_type == 0xa5:
-        analyze_4bs_data(frame_data[1:5], sender)
+    res = {}
+    if device_type == 0xa5:
+        res = analyze_4bs_data(frame_data[1:5], sender)
     print("===================")
+    return res
+
+
+def upload_data(conn: sqlite3.Connection, data: dict):
+    req = "UPDATE air_data SET "
+    for key in data.keys():
+        req += f"{key} = {data[key]}, "  # Generate SQL request based on
+    req = req[:-2] + " WHERE id = 1;"  # Strip away comma
+    with conn:  # Lock the database while writing
+        conn.execute(req)
+    print(req)
 
 
 def main():
+    # Connect to the SQLite database
+    conn = None
+    try:
+        conn = sqlite3.connect("../respire.db")  # TODO: use absolute path
+        print(sqlite3.version)
+        print("Connected to database")
+    except Exception as e:
+        print("Failed to connect to database.", e, sep='\n')
+        return
+
     # Specifying the port in the Serial constructor will automatically open it
     port = serial.Serial(
         port='/dev/ttyS0',
@@ -118,9 +153,11 @@ def main():
         timeout=0.1)
 
     while True:
-        data = port.readall()
-        if data != b'':
-            analyze_frame_content(data)
+        frame = port.readall()
+        if frame != b'':
+            data = analyze_frame_content(frame)
+            if data != {}:
+                upload_data(conn, data)
 
 
 if __name__ == '__main__':
