@@ -111,7 +111,7 @@ def analyze_frame_content(data: bytes):
 def main():
     # Specifying the port in the Serial constructor will automatically open it
     port = serial.Serial(
-        port='/dev/ttyUSB0',
+        port='/dev/ttyS0',
         baudrate=57600,
         stopbits=1,
         parity=serial.PARITY_NONE,
