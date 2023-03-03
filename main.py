@@ -4,6 +4,10 @@ import sqlite3
 from crc import checksum
 
 
+on_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x70\xff\xfb\xd8\x80\x30\x02\xff\xff\xff\xff\x7f\x00\xa2'
+off_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x50\xff\xfb\xd8\x80\x30\x02\xff\xff\xff\xff\x7f\x00\x5c'
+
+
 # TODO: maybe remove?
 def analyze_rps_data(data: int):
     if data < 0 or data > 255:
@@ -148,7 +152,7 @@ def main():
 
     # Specifying the port in the Serial constructor will automatically open it
     port = serial.Serial(
-        port='/dev/ttyS0',
+        port='/dev/ttyUSB0',
         baudrate=57600,
         stopbits=1,
         parity=serial.PARITY_NONE,
