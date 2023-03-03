@@ -5,7 +5,7 @@ from crc import checksum
 
 
 # TODO: maybe remove?
-def analyze_rps_data(data: int, sender: int):
+def analyze_rps_data(data: int):
     if data < 0 or data > 255:
         return
 
@@ -119,6 +119,8 @@ def analyze_frame_content(data: bytes) -> dict:
     res = {}
     if device_type == 0xa5:
         res = analyze_4bs_data(frame_data[1:5], sender)
+    elif device_type == 0xf6:
+        analyze_rps_data(frame_data[1])
     print("===================")
     return res
 
