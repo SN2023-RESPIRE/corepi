@@ -8,28 +8,12 @@ off_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x70\xff\xfb\xd8\x80\x30\x02\xff\xff\x
 on_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x50\xff\xfb\xd8\x80\x30\x02\xff\xff\xff\xff\x7f\x00\x5c'
 
 
-# TODO: maybe remove?
-def analyze_rps_data(data: int):
-    if data < 0 or data > 255:
-        return
-
-    if data == 0x70:
-        print("Button B0 is pressed!")
-    elif data == 0x50:
-        print("Button B1 is pressed!")
-    else:
-        print("No button pressed")
-
-
 def analyze_4bs_data(data: bytes, sender: int) -> dict:
     if sender == 0xffd5a80a:  # CO2 + Temperature + Humidity sensor
         print("CO2 + Temperature + Humidity sensor frame")
         humidity = data[0] * 0.5
         co2 = data[1] * 10
         temp = data[2] * 51 / 255
-        # print(f"Humidity: {humidity}%")
-        # print(f"CO2: {co2} ppm")
-        # print(f"Temperature: {temp}°C")
         return {
             "humidity": humidity,
             "co2_amount": co2,
@@ -39,25 +23,21 @@ def analyze_4bs_data(data: bytes, sender: int) -> dict:
         print("VOC sensor frame")
         voc_amount = (data[0] << 8) + data[1]
         voc_id = data[3]
-        # print(f"VOC amount: {voc_amount} ppb")
-        # print(f"VOC type: {voc_id}")
         return {
             "cov_amount": voc_amount,
         }
     elif sender == 0xffd5a814:  # Particles sensor
         print("Particle sensor frame")
         particles = ((data[0] << 24) + (data[1] << 16) + (data[2] << 8) + data[3]) >> 5
-        # Using a mask is a little easier
+        # Using a mask makes it a little easier
         pm1 = (particles & 0b111111111000000000000000000) >> 18
         pm2 = (particles & 0b000000000111111111000000000) >> 9
         pm10 = particles & 0b000000000000000000111111111
-        # print(f"PM1 Amount: {pm1} µg/m3")
-        # print(f"PM2.5 Amount: {pm2} µg/m3")
-        # print(f"PM10 Amount: {pm10} µg/m3")
         return {
             "pm1_amount": pm1,
             "pm2_5_amount": pm2,
             "pm10_amount": pm10,
+            "send_data": True  # Because of a bigger frame interval, this will determine whether data should be sent
         }
     else:
         print("Unidentified 4BS device detected")
@@ -107,25 +87,12 @@ def analyze_frame_content(data: bytes) -> dict:
         print(f"Invalid data CRC. Expected {hex(frame_data_crc)}, got {hex(self_data_crc)}")
         return {}
 
-    print("Raw frame data:")
-    print(f"\t{data.hex(' ')}")
-    print("Decoded frame data:")
-    print(f"\tData length: {data_length}\n\tOptional Data length: {optional_length}\n"
-          f"\tPacket Type: {hex(packet_type)}\n\tHeader checksum: {hex(self_header_crc)}\n"
-          f"\tFrame Data: {frame_data.hex(' ')}\n\tOptional Data: {optional_data.hex(' ')}\n"
-          f"\tData Checksum: {hex(self_data_crc)}")
-    print(f"\tSender ID: {frame_data[-5:-1].hex(' ')}\n")
-    print("-------------------")
-
     device_type = frame_data[0]
     sender_bytes = frame_data[-5:-1]
     sender = (sender_bytes[0] << 24) + (sender_bytes[1] << 16) + (sender_bytes[2] << 8) + sender_bytes[3]
     res = {}
     if device_type == 0xa5:
         res = analyze_4bs_data(frame_data[1:5], sender)
-    elif device_type == 0xf6:
-        analyze_rps_data(frame_data[1])
-    print("===================")
     return res
 
 
@@ -137,6 +104,7 @@ def upload_data(conn: sqlite3.Connection, data: dict):
     with conn:  # Lock the database while writing
         conn.execute(req)
     print(req)
+    # TODO: make HTTP request
 
 
 def main():
@@ -144,10 +112,9 @@ def main():
     conn = None
     try:
         conn = sqlite3.connect("../respire.db")  # TODO: use absolute path
-        print(sqlite3.version)
-        print("Connected to database")
+        print("Connected to local database")
     except Exception as e:
-        print("Failed to connect to database.", e, sep='\n')
+        print("Failed to connect to local database.", e, sep='\n')
         return
 
     # Specifying the port in the Serial constructor will automatically open it
@@ -158,12 +125,24 @@ def main():
         parity=serial.PARITY_NONE,
         timeout=0.1)
 
+    # Receiving particle values will determine if we send data to both databases or not.
+    # The first particle values obtained are ignored just to make sure we get all the values at least once.
+    data_cache = {}
+    ignored_first_send_request = False
+
     while True:
-        frame = port.readall()
-        if frame != b'':
+        if 21 <= port.in_waiting <= 25:
+            frame = port.readall()
             data = analyze_frame_content(frame)
-            if data != {}:
-                upload_data(conn, data)
+            for k, d in data.items():
+                if k == "send_data":
+                    continue
+                data_cache[k] = d
+            if data.get("send_data") is not None:
+                if ignored_first_send_request:
+                    upload_data(conn, data_cache)
+                else:
+                    ignored_first_send_request = True
 
 
 if __name__ == '__main__':
