@@ -125,7 +125,7 @@ def main():
 
     # Specifying the port in the Serial constructor will automatically open it
     port = serial.Serial(
-        port='/dev/ttyUSB0',
+        port='/dev/ttyAMA0',
         baudrate=57600,
         stopbits=1,
         parity=serial.PARITY_NONE,
