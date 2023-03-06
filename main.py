@@ -1,3 +1,4 @@
+import requests
 import serial
 import sqlite3
 
@@ -104,7 +105,8 @@ def upload_data(conn: sqlite3.Connection, data: dict):
     with conn:  # Lock the database while writing
         conn.execute(req)
     print(req)
-    # TODO: make HTTP request
+    req = requests.post('http://localhost:8000/deposit-air-data', data)
+    print('Got status code:', req.status_code)
 
 
 def main():
