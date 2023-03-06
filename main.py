@@ -1,6 +1,9 @@
+import os
 import requests
 import serial
 import sqlite3
+
+from dotenv import load_dotenv
 
 from crc import checksum
 
@@ -105,11 +108,12 @@ def upload_data(conn: sqlite3.Connection, data: dict):
     with conn:  # Lock the database while writing
         conn.execute(req)
     print(req)
-    req = requests.post('http://localhost:8000/deposit-air-data', data)
+    req = requests.post(os.getenv("DATABASE_WEBSITE_URL", "http://localhost:8000/deposit-air-data"), data)
     print('Got status code:', req.status_code)
 
 
 def main():
+    load_dotenv()
     # Connect to the SQLite database
     conn = None
     try:
