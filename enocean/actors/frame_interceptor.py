@@ -21,7 +21,7 @@ class FrameInterceptor:
         Check if there is a frame ready to pick up.
         :return: True if there is a frame waiting, False otherwise
         """
-        return 21 <= self.ser.in_waiting <= 25  # TODO: make this more modular
+        return 21 <= self.ser.in_waiting  # TODO: make this more modular
 
     def capture(self) -> Optional[Frame]:
         """
