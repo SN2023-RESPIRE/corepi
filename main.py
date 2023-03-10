@@ -5,7 +5,7 @@ import sqlite3
 
 from dotenv import load_dotenv
 
-from crc import checksum
+from util.crc import crc8
 
 
 off_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x70\xff\xfb\xd8\x80\x30\x02\xff\xff\xff\xff\x7f\x00\xa2'
@@ -68,7 +68,7 @@ def analyze_frame_content(data: bytes) -> dict:
     frame_header_crc = data[5]
 
     # Calculate checksum using whole header, excluding sync byte and CRC
-    self_header_crc = checksum(data[1:5])
+    self_header_crc = crc8(data[1:5])
 
     # Abort on wrong checksum
     if frame_header_crc != self_header_crc:
@@ -85,7 +85,7 @@ def analyze_frame_content(data: bytes) -> dict:
     frame_data_crc = data[-1]
 
     # Calculate checksum using the whole frame excluding the header and data CRC
-    self_data_crc = checksum(data[6:-1])
+    self_data_crc = crc8(data[6:-1])
 
     if frame_data_crc != self_data_crc:
         print(f"Invalid data CRC. Expected {hex(frame_data_crc)}, got {hex(self_data_crc)}")
