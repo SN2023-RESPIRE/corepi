@@ -1,11 +1,10 @@
 import os
 import requests
-import serial
 import sqlite3
 
 from dotenv import load_dotenv
 
-from util.crc import crc8
+from enocean.actors import FrameInterceptor
 
 
 off_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x70\xff\xfb\xd8\x80\x30\x02\xff\xff\xff\xff\x7f\x00\xa2'
@@ -48,58 +47,6 @@ def analyze_4bs_data(data: bytes, sender: int) -> dict:
         return {}
 
 
-def analyze_frame_content(data: bytes) -> dict:
-    # Check frame length
-    length = len(data)
-    if length <= 5:
-        print("Invalid frame size")
-        return {}
-
-    # Check sync byte
-    sync_byte = data[0]
-    if sync_byte != 0x55:
-        print(f"Incorrect sync byte! Expected 0x55, got {hex(sync_byte)}")
-        return {}
-
-    # Retrieve header
-    data_length = data[1] * 255 + data[2]
-    optional_length = data[3]
-    packet_type = data[4]
-    frame_header_crc = data[5]
-
-    # Calculate checksum using whole header, excluding sync byte and CRC
-    self_header_crc = crc8(data[1:5])
-
-    # Abort on wrong checksum
-    if frame_header_crc != self_header_crc:
-        print(f"Invalid header CRC. Expected {hex(frame_header_crc)}, got {hex(self_header_crc)}")
-        return {}
-
-    # Retrieve data
-    frame_data = 0
-    optional_data = 0
-    if data_length > 0:
-        frame_data = data[6:6+data_length]
-    if optional_length > 0:
-        optional_data = data[6+data_length:6+data_length+optional_length]
-    frame_data_crc = data[-1]
-
-    # Calculate checksum using the whole frame excluding the header and data CRC
-    self_data_crc = crc8(data[6:-1])
-
-    if frame_data_crc != self_data_crc:
-        print(f"Invalid data CRC. Expected {hex(frame_data_crc)}, got {hex(self_data_crc)}")
-        return {}
-
-    device_type = frame_data[0]
-    sender_bytes = frame_data[-5:-1]
-    sender = (sender_bytes[0] << 24) + (sender_bytes[1] << 16) + (sender_bytes[2] << 8) + sender_bytes[3]
-    res = {}
-    if device_type == 0xa5:
-        res = analyze_4bs_data(frame_data[1:5], sender)
-    return res
-
-
 def upload_data(conn: sqlite3.Connection, data: dict):
     req = "UPDATE air_data SET "
     for key in data.keys():
@@ -123,13 +70,7 @@ def main():
         print("Failed to connect to local database.", e, sep='\n')
         return
 
-    # Specifying the port in the Serial constructor will automatically open it
-    port = serial.Serial(
-        port='/dev/ttyAMA0',
-        baudrate=57600,
-        stopbits=1,
-        parity=serial.PARITY_NONE,
-        timeout=0.1)
+    interceptor = FrameInterceptor(port='/dev/ttyUSB0')
 
     # Receiving particle values will determine if we send data to both databases or not.
     # The first particle values obtained are ignored just to make sure we get all the values at least once.
@@ -137,9 +78,14 @@ def main():
     ignored_first_send_request = False
 
     while True:
-        if 21 <= port.in_waiting <= 25:
-            frame = port.readall()
-            data = analyze_frame_content(frame)
+        if interceptor.available_frame():
+            frame = interceptor.capture()
+            if not frame:
+                continue
+            print(f"Captured frame of type {hex(frame.device_type)}")
+            if frame.device_type != 0xa5:
+                continue
+            data = analyze_4bs_data(frame.data, frame.sender)
             for k, d in data.items():
                 if k == "send_data":
                     continue

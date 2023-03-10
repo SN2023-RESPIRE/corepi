@@ -1,1 +1,1 @@
-from crc import crc8
+from .crc import crc8
