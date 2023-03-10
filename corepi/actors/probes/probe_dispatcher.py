@@ -1,6 +1,6 @@
 from typing import Optional
 
-from enocean.actors.probes import Probe
+from corepi.actors.probes import Probe
 
 
 class ProbeDispatcher:

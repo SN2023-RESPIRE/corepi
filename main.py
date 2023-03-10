@@ -4,8 +4,8 @@ import sqlite3
 
 from dotenv import load_dotenv
 
-from enocean.actors import FrameInterceptor
-from enocean.actors.probes import *
+from corepi.actors import FrameInterceptor
+from corepi.actors.probes import *
 
 off_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x70\xff\xfb\xd8\x80\x30\x02\xff\xff\xff\xff\x7f\x00\xa2'
 on_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x50\xff\xfb\xd8\x80\x30\x02\xff\xff\xff\xff\x7f\x00\x5c'

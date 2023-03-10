@@ -2,7 +2,7 @@ from typing import Optional
 
 import serial
 
-from enocean import Frame
+from corepi import Frame
 from util import crc8
 
 
