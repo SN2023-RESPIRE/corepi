@@ -34,9 +34,10 @@ def main():
     #     print("Failed to connect to local database.", e, sep='\n')
     #     return
     interceptor = FrameInterceptor(port='/dev/ttyUSB0')
-    ProbeDispatcher.register_probe(Co2Probe(0xffd5a80a))
-    ProbeDispatcher.register_probe(VocProbe(0xffd5a80f))
-    ProbeDispatcher.register_probe(ParticleProbe(0xffd5a814))
+    dispatcher = ProbeDispatcher()
+    dispatcher.register_probe(Co2Probe(0xffd5a80a))
+    dispatcher.register_probe(VocProbe(0xffd5a80f))
+    dispatcher.register_probe(ParticleProbe(0xffd5a814))
 
     while True:
         if interceptor.available_frame():
@@ -46,7 +47,9 @@ def main():
             print(f"Captured frame of type {hex(frame.device_type)}")
             if frame.device_type != 0xa5:
                 continue
-            probe = ProbeDispatcher.get_probe(frame.sender)
+            probe = dispatcher.get_probe(frame.sender)
+            if not probe:
+                continue
             probe.parse(frame.data)
             print(probe.__dict__)
 
