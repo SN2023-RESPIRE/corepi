@@ -34,7 +34,7 @@ CRC_TABLE = [
 ]
 
 
-def checksum(data):
+def crc8(data):
     crc = 0
     for byte in data:
         crc = CRC_TABLE[crc ^ byte]
