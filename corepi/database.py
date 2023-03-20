@@ -15,6 +15,7 @@ class DatabaseService(Thread):
         self.data = {}
         self.timer = timer
         self.event = Event()
+        self.thresholds = {}
 
     def update_values_from_probe(self, probe: Probe):
         if isinstance(probe, Co2Probe):
@@ -28,16 +29,37 @@ class DatabaseService(Thread):
             self.data['pm2_amount'] = probe.pm2_amount
             self.data['pm10_amount'] = probe.pm10_amount
 
+    def update_thresholds(self, probe: Probe):
+        if isinstance(probe, Co2Probe):
+            probe.co2_threshold = self.thresholds['co2']
+            probe.temperature_threshold = self.thresholds['temperature']
+            probe.humidity_threshold = self.thresholds['humidity']
+        elif isinstance(probe, VocProbe):
+            probe.voc_threshold = self.thresholds['voc']
+        elif isinstance(probe, ParticleProbe):
+            probe.pm1_threshold = self.thresholds['pm1']
+            probe.pm2_threshold = self.thresholds['pm2']
+            probe.pm10_threshold = self.thresholds['pm10']
+
     def set(self):
         self.event.set()
 
     def run(self) -> None:
         try:
             db_conn = sqlite3.connect(self.database)
+            db_conn.row_factory = sqlite3.Row
         except Exception as e:
             print("Failed to connect to local database:", e)
             db_conn = False
         while not self.event.is_set():
+            print("Updated thresholds")
+            cur = db_conn.cursor()
+            cur.execute("SELECT * FROM air_thresholds WHERE id=1")
+            row = cur.fetchall()
+            if row:
+                row = dict(row[0])
+                row.pop('id')
+                self.thresholds = row
             if self.event.wait(self.timer):
                 break
             req = "UPDATE air_data SET "

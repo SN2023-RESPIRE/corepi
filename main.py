@@ -20,6 +20,8 @@ def main():
     database.start()
     print("Database thread started")
 
+    is_ventilating = False
+
     try:
         while True:
             if interceptor.available_frame():
@@ -33,6 +35,15 @@ def main():
                     continue
                 print(f"Captured frame from {type(probe).__name__}")
                 probe.parse(frame.data)
+                thresholds = database.update_thresholds(probe)
+                if probe.reached_threshold() and not is_ventilating:
+                    print("Turning fan on")
+                    # interceptor.send_frame(on_frame)
+                    is_ventilating = True
+                elif not probe.reached_threshold() and is_ventilating:
+                    print("Turning fan off")
+                    # interceptor.send_frame(off_frame)
+                    is_ventilating = False
                 database.update_values_from_probe(probe)
     except KeyboardInterrupt:
         print("Stopping database service")

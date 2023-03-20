@@ -81,3 +81,6 @@ class FrameInterceptor:
         frame.sender = sender
         frame.device_type = device_type
         return frame
+
+    def send_frame(self, frame: bytes):
+        self.ser.write(frame)
