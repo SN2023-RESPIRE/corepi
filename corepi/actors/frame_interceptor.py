@@ -10,8 +10,12 @@ class FrameInterceptor:
     """Intercepts EnOcean frames."""
     def __init__(self, port):
         self.port = port
+        self.ser = serial.Serial()
+        self.open()
+
+    def open(self):
         self.ser = serial.Serial(
-            port=port,
+            port=self.port,
             baudrate=57600,
             timeout=0
         )
@@ -83,4 +87,8 @@ class FrameInterceptor:
         return frame
 
     def send_frame(self, frame: bytes):
+        self.ser.close()
+        self.open()
         self.ser.write(frame)
+        self.ser.close()
+        self.open()
