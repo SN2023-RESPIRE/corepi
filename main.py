@@ -11,7 +11,7 @@ on_frame = b'\x55\x00\x07\x07\x01\x7a\xf6\x50\xff\xfb\xd8\x80\x30\x02\xff\xff\xf
 def main():
     load_dotenv()
 
-    interceptor = FrameInterceptor(port='/dev/ttyUSB0')
+    interceptor = FrameInterceptor(port='/dev/ttyAMA0')
     dispatcher = ProbeDispatcher()
     dispatcher.register_probe(Co2Probe(0xffd5a80a))
     dispatcher.register_probe(VocProbe(0xffd5a80f))
