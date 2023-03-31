@@ -11,7 +11,6 @@ class DatabaseService(Thread):
     def __init__(self, database, timer=60):
         super(DatabaseService, self).__init__()
         self.database = database
-        self.send_data = False
         self.data = {}
         self.timer = timer
         self.event = Event()

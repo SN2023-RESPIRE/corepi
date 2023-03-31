@@ -4,7 +4,7 @@ from corepi.actors.probes import Probe
 
 
 class ProbeDispatcher:
-    _probes = []
+    _probes: list[Probe] = []
 
     def register_probe(self, probe: Probe) -> None:
         self._probes.append(probe)
