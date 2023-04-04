@@ -16,7 +16,7 @@ def main():
     dispatcher.register_probe(Co2Probe(0xffd5a80a))
     dispatcher.register_probe(VocProbe(0xffd5a80f))
     dispatcher.register_probe(ParticleProbe(0xffd5a814))
-    database = DatabaseService('../respire.db')
+    database = DatabaseService('../respire.db', timer=5)
     database.start()
     print("Database thread started")
 
@@ -36,7 +36,7 @@ def main():
                     continue
                 print(f"Captured frame from {type(probe).__name__}")
                 probe.parse(frame.data)
-                thresholds = database.update_thresholds(probe)
+                database.update_thresholds(probe)
                 in_list = probe.sender_id in ventilation_data
                 reached_threshold = probe.reached_threshold()
                 if reached_threshold and not in_list:

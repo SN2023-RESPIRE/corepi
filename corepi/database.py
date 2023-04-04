@@ -8,11 +8,11 @@ from corepi.actors.probes import *
 
 
 class DatabaseService(Thread):
-    def __init__(self, database, timer=60):
+    def __init__(self, database, timer=1):
         super(DatabaseService, self).__init__()
         self.database = database
         self.data = {}
-        self.timer = timer
+        self.sleep_minutes = timer
         self.event = Event()
         self.thresholds = {}
 
@@ -43,6 +43,16 @@ class DatabaseService(Thread):
     def set(self):
         self.event.set()
 
+    def update_threshold_values(self, db_conn):
+        cur = db_conn.cursor()
+        cur.execute("SELECT * FROM air_thresholds WHERE id=1;")
+        row = cur.fetchall()
+        if row:
+            row = dict(row[0])
+            row.pop('id')
+            self.thresholds = row
+            print("Updated threshold values")
+
     def run(self) -> None:
         try:
             db_conn = sqlite3.connect(self.database)
@@ -51,15 +61,12 @@ class DatabaseService(Thread):
             print("Failed to connect to local database:", e)
             db_conn = False
         while not self.event.is_set():
-            print("Updated thresholds")
-            cur = db_conn.cursor()
-            cur.execute("SELECT * FROM air_thresholds WHERE id=1")
-            row = cur.fetchall()
-            if row:
-                row = dict(row[0])
-                row.pop('id')
-                self.thresholds = row
-            if self.event.wait(self.timer):
+            event = False
+            for i in range(self.sleep_minutes * 12):
+                self.update_threshold_values(db_conn)
+                if self.event.wait(5):
+                    break
+            if self.event.is_set():
                 break
             req = "UPDATE air_data SET "
             for key in self.data.keys():
