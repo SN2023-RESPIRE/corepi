@@ -53,6 +53,25 @@ class DatabaseService(Thread):
             self.thresholds = row
             print("Updated threshold values")
 
+    def update_air_values_local(self, db_conn):
+        req = "UPDATE air_data SET "
+        for key in self.data.keys():
+            req += f"{key} = {self.data[key]}, "  # Generate SQL request based on
+        req = req[:-2] + " WHERE id = 1;"  # Strip away comma
+        if db_conn:
+            try:
+                with db_conn:  # Lock the database while writing
+                    db_conn.execute(req)
+                print(req)
+            except Exception as e:
+                print("Failed to update internal database:", e)
+
+    def update_air_values_remote(self):
+        uri = os.getenv("DATABASE_WEBSITE_URI")
+        if uri:
+            req = requests.post(uri, data=json.dumps(self.data))
+            print("Sent data to server. Status code:", req.status_code)
+
     def run(self) -> None:
         try:
             db_conn = sqlite3.connect(self.database)
@@ -68,20 +87,7 @@ class DatabaseService(Thread):
                     break
             if self.event.is_set():
                 break
-            req = "UPDATE air_data SET "
-            for key in self.data.keys():
-                req += f"{key} = {self.data[key]}, "  # Generate SQL request based on
-            req = req[:-2] + " WHERE id = 1;"  # Strip away comma
-            if db_conn:
-                try:
-                    with db_conn:  # Lock the database while writing
-                        db_conn.execute(req)
-                    print(req)
-                except Exception as e:
-                    print("Failed to update internal database:", e)
-            uri = os.getenv("DATABASE_WEBSITE_URI")
-            if uri:
-                req = requests.post(uri, data=json.dumps(self.data))
-                print("Sent data to server. Status code:", req.status_code)
+            self.update_air_values_local(db_conn)
+            self.update_air_values_remote()
         if db_conn:
             db_conn.close()
