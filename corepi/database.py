@@ -83,6 +83,7 @@ class DatabaseService(Thread):
             event = False
             for i in range(self.sleep_minutes * 12):
                 self.update_threshold_values(db_conn)
+                self.update_air_values_local(db_conn)
                 if self.event.wait(5):
                     break
             if self.event.is_set():
